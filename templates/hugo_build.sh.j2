@@ -1,0 +1,44 @@
+#!/bin/sh
+
+build_site() {
+    HUGO_SITE_PATH="$1"
+    HUGO_CLONE_URI="$2"
+    HUGO_SERVE_PATH="$3"
+    # Does the Hugo content path exist
+    if [ ! -d "$HUGO_SITE_PATH" ] ; then
+        mkdir -p "$HUGO_SITE_PATH"
+    fi
+
+    # Jump into the content path
+    cd "$HUGO_SITE_PATH" || { echo >&2 "Could not cd into content path: ${HUGO_SITE_PATH}"; exit 1; }
+
+    # If we have .git update, otherwise clone
+    if [ -d .git ] ; then
+        git pull
+    else
+        git clone "$HUGO_CLONE_URI" .
+    fi
+
+    # Submodules?
+    if [ -f .gitmodules ] ; then
+        git submodule update --init
+    fi
+
+    # Build destdir if it doesn't exist
+    if [ ! -d "$HUGO_SERVE_PATH" ] ; then
+        mkdir -p "$HUGO_SERVE_PATH"
+    fi
+
+    # build
+    hugo
+
+    # Deploy the site
+    rsync -a public/ "$HUGO_SERVE_PATH"
+
+    # Fix the system permissions
+    chmod og+rX "$HUGO_SERVE_PATH"
+}
+
+{% for site in hugo_sites %}
+build_site "/opt/var/hugo/{{ site.name }}" "{{ site.source_url }}" "{{ site.root_path}}"
+{% endfor %}
